@@ -9,7 +9,7 @@ export async function GET(
 ) {
   const { slug } = await params;
   const { searchParams } = new URL(request.url);
-  const paramId = searchParams.get('id');
+  const paramId = searchParams.get('id') || searchParams.get('ID');
 
   const supabase = await createClient();
 
@@ -24,22 +24,31 @@ export async function GET(
     return NextResponse.json({ error: 'Redirect not found' }, { status: 404 });
   }
 
-  // 2. 非同期でログを記録
   const ip = request.headers.get('x-forwarded-for') || 'unknown';
   const ua = request.headers.get('user-agent') || 'unknown';
 
-  supabase
+  // 2. ログ記録用のプロミス（awaitしない）
+  const logPromise = supabase
     .from('access_logs')
     .insert({
       redirect_id: redirect.id,
       param_id: paramId,
       ip_address: ip,
       user_agent: ua,
-    })
-    .then(({ error: logError }) => {
-      if (logError) console.error('Failed to log access:', logError);
     });
 
   // 3. 転送実行
-  return NextResponse.redirect(new URL(redirect.target_url), 302);
+  const response = NextResponse.redirect(new URL(redirect.target_url), 302);
+
+  // Vercel / Next.js 15 の魔法: waitUntil
+  // ユーザーには即座にレスポンスを返すが、裏でログ記録が完了するまでプロセスを維持する。
+  // これで「爆速」と「確実な記録」を両立できる。
+  if ((request as any).waitUntil) {
+    (request as any).waitUntil(logPromise);
+  } else {
+    // ローカル環境等のフォールバック
+    await logPromise;
+  }
+
+  return response;
 }
