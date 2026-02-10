@@ -36,27 +36,27 @@ export default function LoginPage() {
           <div className="p-4 bg-indigo-600 rounded-2xl shadow-lg mb-4">
             <Ghost className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-black tracking-tight uppercase">RedirectFlow</h1>
+          <h1 className="text-2xl font-black tracking-tight uppercase text-zinc-900 dark:text-white">RedirectFlow</h1>
           <p className="text-sm text-zinc-500 font-bold italic">Admin Login</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
+            <label className="block text-sm font-medium mb-1 text-zinc-700 dark:text-zinc-300">Email</label>
             <input
               type="email"
               required
-              className="w-full p-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-transparent"
+              className="w-full p-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Password</label>
+            <label className="block text-sm font-medium mb-1 text-zinc-700 dark:text-zinc-300">Password</label>
             <input
               type="password"
               required
-              className="w-full p-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-transparent"
+              className="w-full p-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -64,7 +64,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2"
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {loading ? 'Logging in...' : <><LogIn className="w-4 h-4" /> Login</>}
           </button>
