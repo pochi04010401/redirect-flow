@@ -31,7 +31,7 @@ export function CreateRedirectForm({ onCreated }: { onCreated: () => void }) {
       if (error) {
         setErrorInfo({ 
           message: error.message, 
-          code: error.code || `STATUS_${error.status}` 
+          code: error.code
         });
         return;
       }

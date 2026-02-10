@@ -36,7 +36,7 @@ export default function LoginPage() {
         setMsg({ 
           type: 'error', 
           text: `ログイン失敗: ${error.message}`,
-          code: error.status ? `SUPABASE_AUTH_ERROR_${error.status}` : 'AUTH_FAILED'
+          code: error.code || 'AUTH_FAILED'
         });
         console.error('Login error:', error);
       } else if (data.user) {
