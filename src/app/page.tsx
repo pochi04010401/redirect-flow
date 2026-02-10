@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react';
 import { CreateRedirectForm } from '@/components/CreateRedirectForm';
 import { RedirectList } from '@/components/RedirectList';
 import { Ghost, ArrowRightLeft, LogOut } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 
 export default function Home() {
+  const supabase = createClient();
   const [refreshKey, setRefreshKey] = useState(0);
   const router = useRouter();
 

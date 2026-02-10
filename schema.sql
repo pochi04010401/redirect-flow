@@ -5,7 +5,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 1. Redirects table
 CREATE TABLE redirects (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   slug TEXT UNIQUE NOT NULL, -- 12 random characters
   target_url TEXT NOT NULL,
   notification_email TEXT,
@@ -16,7 +16,7 @@ CREATE TABLE redirects (
 
 -- 2. Access logs table
 CREATE TABLE access_logs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   redirect_id UUID REFERENCES redirects(id) ON DELETE CASCADE,
   param_id TEXT, -- The "id" parameter from URL
   ip_address TEXT, -- For unique user counting
@@ -40,5 +40,12 @@ CREATE POLICY "Allow public read of redirects" ON redirects FOR SELECT USING (tr
 CREATE POLICY "Allow public insert of access logs" ON access_logs FOR INSERT WITH CHECK (true);
 
 -- Admin policies (Authenticated users can do everything)
-CREATE POLICY "Allow admin full access to redirects" ON redirects FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Allow admin full access to access logs" ON access_logs FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- We use separate policies for clarity and reliability
+CREATE POLICY "Allow admin select redirects" ON redirects FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Allow admin insert redirects" ON redirects FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Allow admin update redirects" ON redirects FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow admin delete redirects" ON redirects FOR DELETE TO authenticated USING (true);
+
+CREATE POLICY "Allow admin select access logs" ON access_logs FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Allow admin update access logs" ON access_logs FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow admin delete access logs" ON access_logs FOR DELETE TO authenticated USING (true);

@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { Plus, RefreshCw, Mail, CheckCircle2 } from 'lucide-react';
 import { generateSlug } from '@/lib/utils';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 import { NotificationFrequency } from '@/types';
 
 export function CreateRedirectForm({ onCreated }: { onCreated: () => void }) {
+  const supabase = createClient();
   const [targetUrl, setTargetUrl] = useState('');
   const [notificationEmail, setNotificationEmail] = useState('');
   const [frequency, setFrequency] = useState<NotificationFrequency>('none');
@@ -31,9 +32,9 @@ export function CreateRedirectForm({ onCreated }: { onCreated: () => void }) {
       setNotificationEmail('');
       setFrequency('none');
       onCreated();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('作成に失敗しました');
+      alert(`作成に失敗しました: ${err.message || '不明なエラー'}`);
     } finally {
       setLoading(false);
     }

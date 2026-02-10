@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { ExternalLink, Copy, Check, BarChart3, Download, Trash2 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 import { Redirect } from '@/types';
 
 export function RedirectList() {
+  const supabase = createClient();
   const [redirects, setRedirects] = useState<Redirect[]>([]);
   const [stats, setStats] = useState<Record<string, { total: number; unique: number }>>({});
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
