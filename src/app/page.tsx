@@ -38,7 +38,7 @@ export default function Home() {
         
         <div className="flex items-center gap-6">
           <div className="text-xs font-mono text-zinc-400">
-            v1.0.5
+            v1.1.0
           </div>
           <button 
             onClick={handleLogout}

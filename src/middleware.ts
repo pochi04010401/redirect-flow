@@ -1,18 +1,16 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
+  let supabaseResponse = NextResponse.next({
+    request,
   });
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    return response;
+    return supabaseResponse;
   }
 
   const supabase = createServerClient(
@@ -20,67 +18,58 @@ export async function middleware(request: NextRequest) {
     supabaseAnonKey,
     {
       cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
+        getAll() {
+          return request.cookies.getAll();
         },
-        set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value,
-            ...options,
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          supabaseResponse = NextResponse.next({
+            request,
           });
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          });
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          });
-        },
-        remove(name: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value: '',
-            ...options,
-          });
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          });
-          response.cookies.set({
-            name,
-            value: '',
-            ...options,
-          });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          );
         },
       },
     }
   );
 
-  // 重要: セッションの更新
-  const { data: { session } } = await supabase.auth.getSession();
+  // 重要: getUser() を使用してセッションを検証し、必要に応じて更新する
+  // getSession() よりも安全で、SSR パターンの推奨事項に合致する
+  const { data: { user } } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
 
-  // ログインページと転送用URLは常に許可
-  if (pathname.startsWith('/login') || pathname.startsWith('/r/')) {
-    // ログイン済みならトップへ
-    if (session && pathname.startsWith('/login')) {
-      return NextResponse.redirect(new URL('/', request.url));
-    }
+  // 転送用URL (/r/[slug]) は認証不要で通過させる
+  if (pathname.startsWith('/r/')) {
+    return supabaseResponse;
+  }
+
+  // 認証済みユーザーがログインページにアクセスした場合はトップへリダイレクト
+  if (user && pathname.startsWith('/login')) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/';
+    const response = NextResponse.redirect(url);
+    // 重要: 更新された可能性のあるクッキーをリダイレクトレスポンスに引き継ぐ
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      response.cookies.set(cookie.name, cookie.value, cookie);
+    });
     return response;
   }
 
-  // 未ログインならログインページへ
-  if (!session) {
-    return NextResponse.redirect(new URL('/login', request.url));
+  // 未認証ユーザーが保護されたページにアクセスした場合はログインページへリダイレクト
+  if (!user && !pathname.startsWith('/login')) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    const response = NextResponse.redirect(url);
+    // 重要: 更新された可能性のあるクッキーをリダイレクトレスポンスに引き継ぐ
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      response.cookies.set(cookie.name, cookie.value, cookie);
+    });
+    return response;
   }
 
-  return response;
+  return supabaseResponse;
 }
 
 export const config = {
@@ -90,7 +79,7 @@ export const config = {
      * - _next/static (静的ファイル)
      * - _next/image (画像最適化)
      * - favicon.ico (ファビコンファイル)
-     * - その他画像ファイル
+     * - その他画像ファイル (svg, png, jpg, jpeg, gif, webp)
      */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],

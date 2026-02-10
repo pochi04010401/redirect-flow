@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/server';
 
-// ビルド時の静的生成を回避
 export const dynamic = 'force-dynamic';
 
 export async function GET(
@@ -11,6 +10,8 @@ export async function GET(
   const { slug } = await params;
   const { searchParams } = new URL(request.url);
   const paramId = searchParams.get('id');
+
+  const supabase = await createClient();
 
   // 1. 転送先を取得
   const { data: redirect, error } = await supabase

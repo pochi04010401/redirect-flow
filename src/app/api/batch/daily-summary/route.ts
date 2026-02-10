@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/server';
 import { Resend } from 'resend';
 
 export const dynamic = 'force-dynamic';
@@ -7,14 +7,15 @@ export const dynamic = 'force-dynamic';
 const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder');
 
 export async function GET(request: NextRequest) {
-  // セキュリティチェック (Cronジョブからのアクセスであることを確認)
+  // セキュリティチェック
   const authHeader = request.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return new Response('Unauthorized', { status: 401 });
   }
 
+  const supabase = await createClient();
+
   try {
-    // 1. 翌朝6時通知設定のURLを全取得
     const { data: redirects, error: rError } = await supabase
       .from('redirects')
       .select('*')
@@ -30,7 +31,6 @@ export async function GET(request: NextRequest) {
     for (const r of redirects) {
       if (!r.notification_email) continue;
 
-      // 2. 前日分のアクセスログを集計
       const { data: logs, error: lError } = await supabase
         .from('access_logs')
         .select('*')
@@ -40,7 +40,6 @@ export async function GET(request: NextRequest) {
       if (lError) continue;
 
       if (logs.length > 0) {
-        // 3. メール送信
         const uniqueUsers = new Set(logs.map(l => l.param_id).filter(Boolean)).size;
         
         await resend.emails.send({

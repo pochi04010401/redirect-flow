@@ -14,11 +14,13 @@ export default function LoginPage() {
 
   // 既にログインしているかチェック
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
         router.push('/');
       }
-    });
+    };
+    checkUser();
   }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -37,11 +39,9 @@ export default function LoginPage() {
         console.error('Login error:', error);
       } else if (data.user) {
         setMsg({ type: 'success', text: 'ログイン成功！リダイレクト中...' });
-        // クッキーがセットされるまでわずかに待機
-        setTimeout(() => {
-          router.push('/');
-          router.refresh();
-        }, 500);
+        // クッキーを確実に反映させてから移動
+        router.refresh();
+        router.push('/');
       } else {
         setMsg({ type: 'error', text: 'ユーザー情報が取得できませんでした' });
       }
