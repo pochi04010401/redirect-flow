@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+// ビルド時の静的生成を回避
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
@@ -20,7 +23,7 @@ export async function GET(
     return NextResponse.json({ error: 'Redirect not found' }, { status: 404 });
   }
 
-  // 2. 非同期でログを記録（転送を優先するためawaitしない）
+  // 2. 非同期でログを記録
   const ip = request.headers.get('x-forwarded-for') || 'unknown';
   const ua = request.headers.get('user-agent') || 'unknown';
 
