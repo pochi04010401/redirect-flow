@@ -6,23 +6,20 @@ import { useRouter } from 'next/navigation';
 import { Ghost, LogIn, AlertCircle, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
-  const supabase = createClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState<{ type: 'error' | 'success', text: string } | null>(null);
+  const [msg, setMsg] = useState<{ type: 'error' | 'success', text: string, code?: string } | null>(null);
   const router = useRouter();
+  const supabase = createClient();
 
-  // 既にログインしているかチェック
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
         router.push('/');
       }
-    };
-    checkUser();
-  }, [router]);
+    });
+  }, [router, supabase.auth]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,26 +33,30 @@ export default function LoginPage() {
       });
 
       if (error) {
-        setMsg({ type: 'error', text: `ログイン失敗: ${error.message}` });
+        setMsg({ 
+          type: 'error', 
+          text: `ログイン失敗: ${error.message}`,
+          code: error.status ? `SUPABASE_AUTH_ERROR_${error.status}` : 'AUTH_FAILED'
+        });
         console.error('Login error:', error);
       } else if (data.user) {
-        setMsg({ type: 'success', text: 'ログイン成功！リダイレクト中...' });
-        // クッキーを確実に反映させてから移動
-        router.refresh();
+        setMsg({ type: 'success', text: 'ログイン成功！' });
         router.push('/');
-      } else {
-        setMsg({ type: 'error', text: 'ユーザー情報が取得できませんでした' });
+        router.refresh();
       }
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : '不明なエラー';
-      setMsg({ type: 'error', text: `例外が発生しました: ${errorMessage}` });
+    } catch (err: any) {
+      setMsg({ 
+        type: 'error', 
+        text: `例外が発生しました: ${err.message}`,
+        code: err.code || 'UNKNOWN_EXCEPTION'
+      });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-4 font-sans">
       <div className="w-full max-w-md p-8 bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800">
         <div className="flex flex-col items-center mb-8">
           <div className="p-4 bg-indigo-600 rounded-2xl shadow-lg mb-4">
@@ -66,11 +67,18 @@ export default function LoginPage() {
         </div>
 
         {msg && (
-          <div className={`mb-6 p-4 rounded-xl flex items-center gap-3 text-sm ${
+          <div className={`mb-6 p-4 rounded-xl flex flex-col gap-1 text-sm ${
             msg.type === 'error' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-green-50 text-green-600 border border-green-100'
           }`}>
-            {msg.type === 'error' ? <AlertCircle className="w-4 h-4 flex-shrink-0" /> : <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />}
-            {msg.text}
+            <div className="flex items-center gap-3">
+              {msg.type === 'error' ? <AlertCircle className="w-4 h-4 flex-shrink-0" /> : <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />}
+              <span className="font-bold">{msg.text}</span>
+            </div>
+            {msg.code && (
+              <div className="ml-7 mt-1 px-2 py-0.5 bg-red-100 dark:bg-red-900/30 rounded text-[10px] font-mono w-fit">
+                Error Code: {msg.code}
+              </div>
+            )}
           </div>
         )}
 
@@ -106,13 +114,6 @@ export default function LoginPage() {
             Login
           </button>
         </form>
-        
-        <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800 text-center">
-          <p className="text-xs text-zinc-400">
-            ログインできない場合は、Vercelの環境変数が正しいか、<br />
-            Supabaseでユーザーを作成済みか確認してね。👻
-          </p>
-        </div>
       </div>
     </div>
   );
