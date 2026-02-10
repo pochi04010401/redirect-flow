@@ -1,15 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CreateRedirectForm } from '@/components/CreateRedirectForm';
 import { RedirectList } from '@/components/RedirectList';
-import { Ghost, ArrowRightLeft } from 'lucide-react';
+import { Ghost, ArrowRightLeft, LogOut } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
 
 export default function Home() {
   const [refreshKey, setRefreshKey] = useState(0);
+  const router = useRouter();
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+    router.refresh();
   };
 
   return (
@@ -27,8 +36,16 @@ export default function Home() {
           </div>
         </div>
         
-        <div className="flex items-center gap-4 text-xs font-mono text-zinc-400">
-          v1.0.0-BETA
+        <div className="flex items-center gap-6">
+          <div className="text-xs font-mono text-zinc-400">
+            v1.0.4
+          </div>
+          <button 
+            onClick={handleLogout}
+            className="flex items-center gap-2 text-sm font-bold text-zinc-500 hover:text-red-500 transition-colors"
+          >
+            <LogOut className="w-4 h-4" /> ログアウト
+          </button>
         </div>
       </header>
 
