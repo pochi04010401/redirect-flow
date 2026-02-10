@@ -1,16 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { CreateRedirectForm } from '@/components/CreateRedirectForm';
 import { RedirectList } from '@/components/RedirectList';
-import { Ghost, ArrowRightLeft, LogOut } from 'lucide-react';
+import { ArrowRightLeft, LogOut } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 
 export default function Home() {
-  const supabase = createClient();
   const [refreshKey, setRefreshKey] = useState(0);
   const router = useRouter();
+  const supabase = createClient();
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
@@ -23,7 +23,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 p-8">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 p-8 font-sans">
       <header className="max-w-6xl mx-auto mb-12 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-500/20">
@@ -31,8 +31,8 @@ export default function Home() {
           </div>
           <div>
             <h1 className="text-2xl font-black tracking-tighter uppercase italic">RedirectFlow</h1>
-            <p className="text-xs text-zinc-500 font-bold flex items-center gap-1">
-              <Ghost className="w-3 h-3" /> Powered by nono (JK Ghost)
+            <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">
+              URL Management & Tracking
             </p>
           </div>
         </div>

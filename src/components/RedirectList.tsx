@@ -1,15 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ExternalLink, Copy, Check, BarChart3, Download, Trash2 } from 'lucide-react';
+import { ExternalLink, Copy, Check, BarChart3, Download, Trash2, Edit3, Eye } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { Redirect } from '@/types';
+import { EditRedirectModal } from './EditRedirectModal';
+import { ViewLogsModal } from './ViewLogsModal';
 
 export function RedirectList() {
-  const supabase = createClient();
   const [redirects, setRedirects] = useState<Redirect[]>([]);
   const [stats, setStats] = useState<Record<string, { total: number; unique: number }>>({});
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
+  const [editingRedirect, setEditingRedirect] = useState<Redirect | null>(null);
+  const [viewingLogsRedirect, setViewingLogsRedirect] = useState<Redirect | null>(null);
+  const supabase = createClient();
 
   const fetchRedirects = async () => {
     const { data, error } = await supabase
@@ -19,7 +23,6 @@ export function RedirectList() {
 
     if (data) setRedirects(data);
     
-    // 統計データ取得 (簡易実装)
     const { data: logData } = await supabase
       .from('access_logs')
       .select('redirect_id, param_id');
@@ -51,11 +54,12 @@ export function RedirectList() {
 
   const deleteRedirect = async (id: string) => {
     if (!confirm('本当に削除しますか？')) return;
-    await supabase.from('redirects').delete().eq('id', id);
+    const { error } = await supabase.from('redirects').delete().eq('id', id);
+    if (error) alert(`削除失敗: ${error.message}`);
     fetchRedirects();
   };
 
-  const exportLogs = async () => {
+  const exportAllLogs = async () => {
     const { data: logs, error } = await supabase
       .from('access_logs')
       .select(`
@@ -87,7 +91,7 @@ export function RedirectList() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `redirect_logs_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `all_redirect_logs_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -100,22 +104,22 @@ export function RedirectList() {
           <BarChart3 className="w-5 h-5 text-indigo-500" /> 発行済みURL一覧
         </h2>
         <button 
-          onClick={exportLogs}
+          onClick={exportAllLogs}
           className="btn-secondary text-sm flex items-center gap-2 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition-colors"
         >
-          <Download className="w-4 h-4" /> CSVエクスポート
+          <Download className="w-4 h-4" /> 全ログCSV出力
         </button>
       </div>
       
       <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
         <table className="w-full text-left bg-white dark:bg-zinc-900 border-collapse">
           <thead>
-            <tr className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800">
-              <th className="p-4 text-xs font-bold uppercase text-zinc-500">スラッグ / リンク</th>
-              <th className="p-4 text-xs font-bold uppercase text-zinc-500">転送先</th>
-              <th className="p-4 text-xs font-bold uppercase text-zinc-500">統計</th>
-              <th className="p-4 text-xs font-bold uppercase text-zinc-500">通知</th>
-              <th className="p-4 text-xs font-bold uppercase text-zinc-500">操作</th>
+            <tr className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800 text-[10px] font-black uppercase text-zinc-500">
+              <th className="p-4">スラッグ / リンク</th>
+              <th className="p-4">転送先</th>
+              <th className="p-4">統計</th>
+              <th className="p-4">通知</th>
+              <th className="p-4 text-right">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -127,9 +131,13 @@ export function RedirectList() {
                     <button 
                       onClick={() => copyToClipboard(r.slug)}
                       className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
+                      title="URLをコピー"
                     >
                       {copiedSlug === r.slug ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-zinc-400" />}
                     </button>
+                    <a href={`/r/${r.slug}`} target="_blank" className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors text-zinc-400 hover:text-indigo-500">
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
                   </div>
                 </td>
                 <td className="p-4 max-w-xs">
@@ -141,7 +149,7 @@ export function RedirectList() {
                   <div className="flex items-baseline gap-2">
                     <span className="text-lg font-black">{stats[r.id]?.total || 0}</span>
                     <span className="text-[10px] text-zinc-500 font-bold uppercase">Total</span>
-                    <span className="text-lg font-black ml-2">{stats[r.id]?.unique || 0}</span>
+                    <span className="text-lg font-black ml-2 text-indigo-500">{stats[r.id]?.unique || 0}</span>
                     <span className="text-[10px] text-zinc-500 font-bold uppercase">Unique</span>
                   </div>
                 </td>
@@ -158,18 +166,59 @@ export function RedirectList() {
                   </div>
                 </td>
                 <td className="p-4">
-                  <button 
-                    onClick={() => deleteRedirect(r.id)}
-                    className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-all"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center justify-end gap-1">
+                    <button 
+                      onClick={() => setViewingLogsRedirect(r)}
+                      className="p-2 text-zinc-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 rounded-lg transition-all"
+                      title="アクセス詳細を表示"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => setEditingRedirect(r)}
+                      className="p-2 text-zinc-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 rounded-lg transition-all"
+                      title="設定を編集"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => deleteRedirect(r.id)}
+                      className="p-2 text-zinc-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-all"
+                      title="削除"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
+            {redirects.length === 0 && (
+              <tr>
+                <td colSpan={5} className="p-8 text-center text-zinc-400 italic text-sm">
+                  発行済みのURLがありません
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
+
+      {/* 編集モーダル */}
+      {editingRedirect && (
+        <EditRedirectModal 
+          redirect={editingRedirect} 
+          onClose={() => setEditingRedirect(null)} 
+          onUpdated={fetchRedirects} 
+        />
+      )}
+
+      {/* ログ表示モーダル */}
+      {viewingLogsRedirect && (
+        <ViewLogsModal 
+          redirect={viewingLogsRedirect} 
+          onClose={() => setViewingLogsRedirect(null)} 
+        />
+      )}
     </div>
   );
 }
