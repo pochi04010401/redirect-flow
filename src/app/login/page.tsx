@@ -45,8 +45,9 @@ export default function LoginPage() {
       } else {
         setMsg({ type: 'error', text: 'ユーザー情報が取得できませんでした' });
       }
-    } catch (err: any) {
-      setMsg({ type: 'error', text: `例外が発生しました: ${err.message || '不明なエラー'}` });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : '不明なエラー';
+      setMsg({ type: 'error', text: `例外が発生しました: ${errorMessage}` });
     } finally {
       setLoading(false);
     }
