@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // 1. 公開パスは常に許可
+  // 1. 公開パスは即時許可（門番の対象外）
   if (
     pathname.startsWith('/r/') || 
     pathname.startsWith('/login') ||
@@ -17,6 +17,7 @@ export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+  // 環境変数が無い場合は、500エラーを避けるためにそのまま通す
   if (!supabaseUrl || !supabaseAnonKey) {
     return NextResponse.next();
   }
@@ -44,7 +45,7 @@ export async function middleware(request: NextRequest) {
             response.cookies.set({ name, value, ...options });
           },
           remove(name: string, options: CookieOptions) {
-            request.cookies.set({ name, value, ...options });
+            request.cookies.set({ name, value: '', ...options });
             response = NextResponse.next({
               request: { headers: request.headers },
             });
@@ -54,20 +55,24 @@ export async function middleware(request: NextRequest) {
       }
     );
 
-    // getSessionは非推奨になりつつあるのでgetUserを使う
+    // getUser() を使ってセッションを確実に検証
     const { data: { user } } = await supabase.auth.getUser();
 
+    // 未ログインならログインページへリダイレクト
     if (!user) {
-      return NextResponse.redirect(new URL('/login', request.url));
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      return NextResponse.redirect(url);
     }
   } catch (e) {
-    // エラー時は安全のためにログイン画面へ飛ばさない（ループ回避）
-    console.error('Middleware Auth Error:', e);
+    console.error('Middleware Error:', e);
   }
 
   return response;
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  ],
 };
