@@ -4,12 +4,12 @@ import { NextResponse, type NextRequest } from 'next/server';
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // 1. 公開パス (/r/..., /login, 静的ファイル) は常に許可
+  // 1. 公開パスは常に許可
   if (
     pathname.startsWith('/r/') || 
     pathname.startsWith('/login') ||
     pathname.startsWith('/_next') ||
-    pathname.includes('.') // favicon.ico, images etc
+    pathname.includes('.')
   ) {
     return NextResponse.next();
   }
@@ -17,8 +17,7 @@ export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // 環境変数が無い場合は、500エラーを避けるためにそのまま通す（ページ側でエラーが出る）
-  if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('placeholder')) {
+  if (!supabaseUrl || !supabaseAnonKey) {
     return NextResponse.next();
   }
 
@@ -45,24 +44,24 @@ export async function middleware(request: NextRequest) {
             response.cookies.set({ name, value, ...options });
           },
           remove(name: string, options: CookieOptions) {
-            request.cookies.set({ name, value: '', ...options });
+            request.cookies.set({ name, value, ...options });
             response = NextResponse.next({
               request: { headers: request.headers },
             });
-            response.cookies.set({ name, value: '', ...options });
+            response.cookies.set({ name, value, ...options });
           },
         },
       }
     );
 
-    // セッションを確認
-    const { data: { session } } = await supabase.auth.getSession();
+    // getSessionは非推奨になりつつあるのでgetUserを使う
+    const { data: { user } } = await supabase.auth.getUser();
 
-    // 未ログインならログインページへ強制送還
-    if (!session) {
+    if (!user) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
   } catch (e) {
+    // エラー時は安全のためにログイン画面へ飛ばさない（ループ回避）
     console.error('Middleware Auth Error:', e);
   }
 
