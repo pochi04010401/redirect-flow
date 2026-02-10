@@ -11,8 +11,13 @@ export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // 環境変数が設定されていない、またはプレースホルダの場合は、認証をスキップしてアクセスを許可（設定を促すため）
+  // 環境変数が無い場合は、500エラーを避けるためにそのまま通す（ページ側でエラーが出る）
   if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('placeholder')) {
+    return response;
+  }
+
+  // 転送用URL (/r/[slug]) は認証チェックをスキップ
+  if (request.nextUrl.pathname.startsWith('/r/')) {
     return response;
   }
 
@@ -63,30 +68,24 @@ export async function middleware(request: NextRequest) {
       }
     );
 
-    // getUser() を使ってセッションを確実に検証
-    const { data: { user }, error } = await supabase.auth.getUser();
+    // セッションを確認
+    const { data: { session } } = await supabase.auth.getSession();
 
-    // 転送用URL (/r/[slug]) は常に許可
-    if (request.nextUrl.pathname.startsWith('/r/')) {
-      return response;
-    }
+    const isLoginPage = request.nextUrl.pathname.startsWith('/login');
 
-    // ログインページへのアクセス
-    if (request.nextUrl.pathname.startsWith('/login')) {
-      if (user) {
-        // ログイン済みならトップへ
+    if (session) {
+      // ログイン済みでログインページにいようとしたらトップへ
+      if (isLoginPage) {
         return NextResponse.redirect(new URL('/', request.url));
       }
-      return response;
-    }
-
-    // それ以外のページで未ログインならログイン画面へ
-    if (!user) {
-      return NextResponse.redirect(new URL('/login', request.url));
+    } else {
+      // 未ログインでログインページ以外にいようとしたらログインページへ
+      if (!isLoginPage) {
+        return NextResponse.redirect(new URL('/login', request.url));
+      }
     }
   } catch (e) {
     console.error('Middleware Error:', e);
-    return response;
   }
 
   return response;
@@ -94,13 +93,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * 次のパスを除くすべてのリクエストパスにマッチ:
-     * - _next/static (静的ファイル)
-     * - _next/image (画像最適化)
-     * - favicon.ico (ファビコンファイル)
-     * - その他画像ファイル
-     */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
