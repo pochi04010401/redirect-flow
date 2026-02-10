@@ -2,24 +2,31 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
+  const { pathname } = request.nextUrl;
+  
+  // 1. 公開パス (/r/..., /login, 静的ファイル) は常に許可
+  if (
+    pathname.startsWith('/r/') || 
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/_next') ||
+    pathname.includes('.') // favicon.ico, images etc
+  ) {
+    return NextResponse.next();
+  }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   // 環境変数が無い場合は、500エラーを避けるためにそのまま通す（ページ側でエラーが出る）
   if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('placeholder')) {
-    return response;
+    return NextResponse.next();
   }
 
-  // 転送用URL (/r/[slug]) は認証チェックをスキップ
-  if (request.nextUrl.pathname.startsWith('/r/')) {
-    return response;
-  }
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
 
   try {
     const supabase = createServerClient(
@@ -31,38 +38,18 @@ export async function middleware(request: NextRequest) {
             return request.cookies.get(name)?.value;
           },
           set(name: string, value: string, options: CookieOptions) {
-            request.cookies.set({
-              name,
-              value,
-              ...options,
-            });
+            request.cookies.set({ name, value, ...options });
             response = NextResponse.next({
-              request: {
-                headers: request.headers,
-              },
+              request: { headers: request.headers },
             });
-            response.cookies.set({
-              name,
-              value,
-              ...options,
-            });
+            response.cookies.set({ name, value, ...options });
           },
           remove(name: string, options: CookieOptions) {
-            request.cookies.set({
-              name,
-              value: '',
-              ...options,
-            });
+            request.cookies.set({ name, value: '', ...options });
             response = NextResponse.next({
-              request: {
-                headers: request.headers,
-              },
+              request: { headers: request.headers },
             });
-            response.cookies.set({
-              name,
-              value: '',
-              ...options,
-            });
+            response.cookies.set({ name, value: '', ...options });
           },
         },
       }
@@ -71,28 +58,17 @@ export async function middleware(request: NextRequest) {
     // セッションを確認
     const { data: { session } } = await supabase.auth.getSession();
 
-    const isLoginPage = request.nextUrl.pathname.startsWith('/login');
-
-    if (session) {
-      // ログイン済みでログインページにいようとしたらトップへ
-      if (isLoginPage) {
-        return NextResponse.redirect(new URL('/', request.url));
-      }
-    } else {
-      // 未ログインでログインページ以外にいようとしたらログインページへ
-      if (!isLoginPage) {
-        return NextResponse.redirect(new URL('/login', request.url));
-      }
+    // 未ログインならログインページへ強制送還
+    if (!session) {
+      return NextResponse.redirect(new URL('/login', request.url));
     }
   } catch (e) {
-    console.error('Middleware Error:', e);
+    console.error('Middleware Auth Error:', e);
   }
 
   return response;
 }
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 };
