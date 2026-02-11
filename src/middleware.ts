@@ -40,8 +40,8 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // 転送用URL (/r/[slug]) は認証不要で通過させる
-  if (pathname.startsWith('/r/')) {
+  // 転送用URL (/r/[slug]) および API (/api/...) は認証不要で通過させる
+  if (pathname.startsWith('/r/') || pathname.startsWith('/api/')) {
     return supabaseResponse;
   }
 

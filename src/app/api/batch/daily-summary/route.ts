@@ -28,6 +28,8 @@ export async function GET(request: NextRequest) {
     yesterday.setHours(0, 0, 0, 0);
     const yesterdayIso = yesterday.toISOString();
 
+    const isTest = request.nextUrl.searchParams.get('test') === 'true';
+
     for (const r of redirects) {
       if (!r.notification_email) continue;
       console.log(`Processing summary for: ${r.slug} -> ${r.notification_email}`);
@@ -43,18 +45,20 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      if (logs.length > 0) {
+      // ログがある場合、またはテストモードの場合に送信
+      if (logs.length > 0 || isTest) {
         const uniqueUsers = new Set(logs.map(l => l.param_id).filter(Boolean)).size;
         
         try {
           const { data, error: mailError } = await resend.emails.send({
-            from: 'RedirectFlow <notifications@myclaw.ai>',
+            // ドメイン未認証の場合のフォールバック（テスト時など）
+            from: process.env.RESEND_FROM_EMAIL || 'RedirectFlow <notifications@myclaw.ai>',
             to: r.notification_email,
-            subject: `【RedirectFlow】昨日の集計レポート: ${r.slug}`,
+            subject: `${isTest ? '[TEST] ' : ''}【RedirectFlow】集計レポート: ${r.slug}`,
             html: `
-              <h1>アクセス集計レポート</h1>
+              <h1>${isTest ? 'テスト用 ' : ''}アクセス集計レポート</h1>
               <p><strong>対象URL:</strong> ${r.slug} (${r.target_url})</p>
-              <p><strong>集計期間:</strong> ${yesterday.toLocaleDateString()}</p>
+              <p><strong>集計期間:</strong> ${yesterday.toLocaleDateString()} ${isTest ? '(テスト送信)' : ''}</p>
               <hr />
               <ul>
                 <li><strong>総アクセス数:</strong> ${logs.length} 件</li>
