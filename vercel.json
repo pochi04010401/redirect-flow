@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/batch/daily-summary",
-      "schedule": "0 6 * * *"
+      "schedule": "0 21 * * *"
     }
   ]
 }

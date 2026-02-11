@@ -97,6 +97,42 @@ export function RedirectList() {
     document.body.removeChild(link);
   };
 
+  const exportLogsBySlug = async (redirect: Redirect) => {
+    const { data: logs, error } = await supabase
+      .from('access_logs')
+      .select('*')
+      .eq('redirect_id', redirect.id)
+      .order('created_at', { ascending: false });
+
+    if (error || !logs) {
+      alert('ログの取得に失敗しました');
+      return;
+    }
+
+    if (logs.length === 0) {
+      alert('アクセスログがありません');
+      return;
+    }
+
+    const headers = ['日時', 'IDパラメータ', 'IPアドレス', 'UserAgent'];
+    const rows = logs.map(log => [
+      log.created_at,
+      log.param_id || '',
+      log.ip_address || '',
+      `"${log.user_agent?.replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `logs_${redirect.slug}_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="mt-8 space-y-4">
       <div className="flex items-center justify-between">
@@ -167,6 +203,13 @@ export function RedirectList() {
                 </td>
                 <td className="p-4">
                   <div className="flex items-center justify-end gap-1">
+                    <button 
+                      onClick={() => exportLogsBySlug(r)}
+                      className="p-2 text-zinc-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950/30 rounded-lg transition-all"
+                      title="CSV出力"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
                     <button 
                       onClick={() => setViewingLogsRedirect(r)}
                       className="p-2 text-zinc-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 rounded-lg transition-all"
