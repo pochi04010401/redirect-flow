@@ -23,21 +23,21 @@ export function RedirectList() {
 
     if (data) setRedirects(data);
     
-    const { data: logData } = await supabase
-      .from('access_logs')
-      .select('redirect_id, param_id');
+    // Use RPC for real-time aggregation
+    const { data: statsData, error: statsError } = await supabase
+      .rpc('get_redirect_stats');
 
-    if (logData) {
-      const s: Record<string, { total: number; unique: number; ids: Set<string> }> = {};
-      logData.forEach(log => {
-        if (!s[log.redirect_id]) s[log.redirect_id] = { total: 0, unique: 0, ids: new Set() };
-        s[log.redirect_id].total++;
-        if (log.param_id && !s[log.redirect_id].ids.has(log.param_id)) {
-          s[log.redirect_id].ids.add(log.param_id);
-          s[log.redirect_id].unique++;
-        }
+    if (statsData) {
+      const s: Record<string, { total: number; unique: number }> = {};
+      statsData.forEach((row: any) => {
+        s[row.redirect_id] = { 
+          total: row.total_count, 
+          unique: row.unique_count 
+        };
       });
       setStats(s);
+    } else if (statsError) {
+      console.error('Failed to fetch stats via RPC:', statsError);
     }
   };
 
