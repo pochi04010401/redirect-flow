@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { ExternalLink, Copy, Check, BarChart3, Download, Trash2, Edit3, Eye } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { ExternalLink, Copy, Check, BarChart3, Download, Trash2, Edit3, Eye, RefreshCw } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { Redirect } from '@/types';
 import { EditRedirectModal } from './EditRedirectModal';
@@ -13,9 +13,11 @@ export function RedirectList() {
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
   const [editingRedirect, setEditingRedirect] = useState<Redirect | null>(null);
   const [viewingLogsRedirect, setViewingLogsRedirect] = useState<Redirect | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const supabase = createClient();
 
-  const fetchRedirects = async () => {
+  const fetchRedirects = useCallback(async () => {
+    setIsRefreshing(true);
     const { data, error } = await supabase
       .from('redirects')
       .select('*')
@@ -39,11 +41,14 @@ export function RedirectList() {
     } else if (statsError) {
       console.error('Failed to fetch stats via RPC:', statsError);
     }
-  };
+    
+    // 視覚的なフィードバックのために少し待つ
+    setTimeout(() => setIsRefreshing(false), 300);
+  }, [supabase]);
 
   useEffect(() => {
     fetchRedirects();
-  }, []);
+  }, [fetchRedirects]);
 
   const copyToClipboard = (slug: string) => {
     const url = `${window.location.origin}/r/${slug}`;
@@ -138,6 +143,14 @@ export function RedirectList() {
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <BarChart3 className="w-5 h-5 text-indigo-500" /> 発行済みURL一覧
+          <button 
+            onClick={fetchRedirects}
+            disabled={isRefreshing}
+            className="p-2 text-zinc-400 hover:text-indigo-500 transition-all rounded-full hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
+            title="最新データに更新"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
         </h2>
         <button 
           onClick={exportAllLogs}

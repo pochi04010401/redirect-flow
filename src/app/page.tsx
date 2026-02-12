@@ -3,17 +3,21 @@
 import { useState } from 'react';
 import { CreateRedirectForm } from '@/components/CreateRedirectForm';
 import { RedirectList } from '@/components/RedirectList';
-import { ArrowRightLeft, LogOut } from 'lucide-react';
+import { ArrowRightLeft, LogOut, RefreshCw } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 
 export default function Home() {
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
   const handleRefresh = () => {
+    setIsRefreshing(true);
     setRefreshKey(prev => prev + 1);
+    // 視覚的なフィードバックのために少し待つ
+    setTimeout(() => setIsRefreshing(false), 500);
   };
 
   const handleLogout = async () => {
@@ -38,6 +42,13 @@ export default function Home() {
         </div>
         
         <div className="flex items-center gap-6">
+          <button 
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-2 text-sm font-bold text-indigo-600 hover:text-indigo-500 disabled:text-zinc-400 transition-all"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} /> 更新
+          </button>
           <div className="text-xs font-mono text-zinc-400">
             v1.1.0
           </div>
