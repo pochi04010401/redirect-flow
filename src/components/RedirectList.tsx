@@ -25,7 +25,6 @@ export function RedirectList() {
 
     if (data) setRedirects(data);
     
-    // Use RPC for real-time aggregation
     const { data: statsData, error: statsError } = await supabase
       .rpc('get_redirect_stats');
 
@@ -38,11 +37,8 @@ export function RedirectList() {
         };
       });
       setStats(s);
-    } else if (statsError) {
-      console.error('Failed to fetch stats via RPC:', statsError);
     }
     
-    // 視覚的なフィードバックのために少し待つ
     setTimeout(() => setIsRefreshing(false), 300);
   }, [supabase]);
 
@@ -64,217 +60,135 @@ export function RedirectList() {
     fetchRedirects();
   };
 
-  const exportAllLogs = async () => {
-    const { data: logs, error } = await supabase
-      .from('access_logs')
-      .select(`
-        created_at,
-        param_id,
-        ip_address,
-        user_agent,
-        redirects ( slug, target_url )
-      `)
-      .order('created_at', { ascending: false });
-
-    if (error || !logs) {
-      alert('ログの取得に失敗しました');
-      return;
-    }
-
-    const headers = ['日時', 'スラッグ', 'IDパラメータ', '転送先URL', 'IPアドレス', 'UserAgent'];
-    const rows = logs.map((log: any) => [
-      log.created_at,
-      log.redirects?.slug || '',
-      log.param_id || '',
-      log.redirects?.target_url || '',
-      log.ip_address || '',
-      `"${log.user_agent?.replace(/"/g, '""')}"`
-    ]);
-
-    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `all_redirect_logs_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const exportLogsBySlug = async (redirect: Redirect) => {
-    const { data: logs, error } = await supabase
-      .from('access_logs')
-      .select('*')
-      .eq('redirect_id', redirect.id)
-      .order('created_at', { ascending: false });
-
-    if (error || !logs) {
-      alert('ログの取得に失敗しました');
-      return;
-    }
-
-    if (logs.length === 0) {
-      alert('アクセスログがありません');
-      return;
-    }
-
-    const headers = ['日時', 'IDパラメータ', 'IPアドレス', 'UserAgent'];
-    const rows = logs.map(log => [
-      log.created_at,
-      log.param_id || '',
-      log.ip_address || '',
-      `"${log.user_agent?.replace(/"/g, '""')}"`
-    ]);
-
-    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `logs_${redirect.slug}_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   return (
     <div className="mt-8 space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold flex items-center gap-2">
-          <BarChart3 className="w-5 h-5 text-indigo-500" /> 発行済みURL一覧
+          <BarChart3 className="w-5 h-5 text-indigo-500" /> URL List
           <button 
             onClick={fetchRedirects}
             disabled={isRefreshing}
             className="p-2 text-zinc-400 hover:text-indigo-500 transition-all rounded-full hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
-            title="最新データに更新"
           >
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           </button>
         </h2>
-        <button 
-          onClick={exportAllLogs}
-          className="btn-secondary text-sm flex items-center gap-2 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition-colors"
-        >
-          <Download className="w-4 h-4" /> 全ログCSV出力
-        </button>
       </div>
       
-      <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
-        <table className="w-full text-left bg-white dark:bg-zinc-900 border-collapse">
+      {/* Desktop Table View */}
+      <div className="hidden lg:block overflow-hidden rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+        <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800 text-[10px] font-black uppercase text-zinc-500">
-              <th className="p-4">スラッグ / リンク</th>
-              <th className="p-4">転送先</th>
-              <th className="p-4">統計</th>
-              <th className="p-4">通知</th>
-              <th className="p-4 text-right">操作</th>
+            <tr className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800 text-[10px] font-black uppercase text-zinc-400 tracking-widest">
+              <th className="p-5">Slug / Link</th>
+              <th className="p-5">Target</th>
+              <th className="p-5">Analytics</th>
+              <th className="p-5">Notification</th>
+              <th className="p-5 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
             {redirects.map((r) => (
               <tr key={r.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
-                <td className="p-4">
+                <td className="p-5">
                   <div className="flex items-center gap-2">
                     <code className="text-sm font-bold text-indigo-600 dark:text-indigo-400">{r.slug}</code>
-                    <button 
-                      onClick={() => copyToClipboard(r.slug)}
-                      className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
-                      title="URLをコピー"
-                    >
+                    <button onClick={() => copyToClipboard(r.slug)} className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition-all">
                       {copiedSlug === r.slug ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-zinc-400" />}
                     </button>
-                    <a href={`/r/${r.slug}`} target="_blank" className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors text-zinc-400 hover:text-indigo-500">
+                    <a href={`/r/${r.slug}`} target="_blank" className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition-all text-zinc-400 hover:text-indigo-500">
                       <ExternalLink className="w-4 h-4" />
                     </a>
                   </div>
                 </td>
-                <td className="p-4 max-w-xs">
-                  <div className="truncate text-sm text-zinc-600 dark:text-zinc-400" title={r.target_url}>
-                    {r.target_url}
-                  </div>
+                <td className="p-5 max-w-xs">
+                  <div className="truncate text-xs font-medium text-zinc-500" title={r.target_url}>{r.target_url}</div>
                 </td>
-                <td className="p-4">
+                <td className="p-5">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-lg font-black">{stats[r.id]?.total || 0}</span>
-                    <span className="text-[10px] text-zinc-500 font-bold uppercase">Total</span>
-                    <span className="text-lg font-black ml-2 text-indigo-500">{stats[r.id]?.unique || 0}</span>
-                    <span className="text-[10px] text-zinc-500 font-bold uppercase">Unique</span>
+                    <span className="text-base font-black">{stats[r.id]?.total || 0}</span>
+                    <span className="text-[8px] text-zinc-400 font-bold uppercase tracking-tighter">Total</span>
+                    <span className="text-base font-black ml-2 text-indigo-500">{stats[r.id]?.unique || 0}</span>
+                    <span className="text-[8px] text-zinc-400 font-bold uppercase tracking-tighter">Unique</span>
                   </div>
                 </td>
-                <td className="p-4">
-                  <div className="text-xs">
-                    {r.notification_frequency === 'none' ? (
-                      <span className="text-zinc-400">OFF</span>
-                    ) : (
+                <td className="p-5">
+                  <div className="text-[10px]">
+                    {r.notification_frequency === 'none' ? <span className="text-zinc-300">OFF</span> : (
                       <div className="flex flex-col">
-                        <span className="text-indigo-500 font-bold">毎日6時</span>
-                        <span className="text-zinc-500 truncate w-32">{r.notification_email}</span>
+                        <span className="text-indigo-500 font-black">DAILY 6AM</span>
+                        <span className="text-zinc-400 truncate w-32">{r.notification_email}</span>
                       </div>
                     )}
                   </div>
                 </td>
-                <td className="p-4">
+                <td className="p-5">
                   <div className="flex items-center justify-end gap-1">
-                    <button 
-                      onClick={() => exportLogsBySlug(r)}
-                      className="p-2 text-zinc-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950/30 rounded-lg transition-all"
-                      title="CSV出力"
-                    >
-                      <Download className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => setViewingLogsRedirect(r)}
-                      className="p-2 text-zinc-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 rounded-lg transition-all"
-                      title="アクセス詳細を表示"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => setEditingRedirect(r)}
-                      className="p-2 text-zinc-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 rounded-lg transition-all"
-                      title="設定を編集"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => deleteRedirect(r.id)}
-                      className="p-2 text-zinc-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-all"
-                      title="削除"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <button onClick={() => setViewingLogsRedirect(r)} className="p-2 text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 rounded-xl transition-all"><Eye className="w-4 h-4" /></button>
+                    <button onClick={() => setEditingRedirect(r)} className="p-2 text-zinc-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 rounded-xl transition-all"><Edit3 className="w-4 h-4" /></button>
+                    <button onClick={() => deleteRedirect(r.id)} className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-all"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </td>
               </tr>
             ))}
-            {redirects.length === 0 && (
-              <tr>
-                <td colSpan={5} className="p-8 text-center text-zinc-400 italic text-sm">
-                  発行済みのURLがありません
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
       </div>
 
-      {/* 編集モーダル */}
-      {editingRedirect && (
-        <EditRedirectModal 
-          redirect={editingRedirect} 
-          onClose={() => setEditingRedirect(null)} 
-          onUpdated={fetchRedirects} 
-        />
+      {/* Mobile Card View */}
+      <div className="lg:hidden space-y-4">
+        {redirects.map((r) => (
+          <div key={r.id} className="bg-white dark:bg-zinc-900 p-5 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <code className="text-base font-black text-indigo-600 dark:text-indigo-400">{r.slug}</code>
+              <div className="flex items-center gap-1">
+                <button onClick={() => copyToClipboard(r.slug)} className="p-2 bg-zinc-50 dark:bg-zinc-800 rounded-xl">
+                  {copiedSlug === r.slug ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-zinc-400" />}
+                </button>
+                <a href={`/r/${r.slug}`} target="_blank" className="p-2 bg-zinc-50 dark:bg-zinc-800 rounded-xl text-zinc-400">
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              </div>
+            </div>
+            
+            <div className="space-y-1">
+              <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Target URL</p>
+              <p className="text-xs text-zinc-600 dark:text-zinc-300 break-all line-clamp-2">{r.target_url}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 py-3 border-y border-zinc-50 dark:border-zinc-800">
+              <div>
+                <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Total</p>
+                <p className="text-xl font-black">{stats[r.id]?.total || 0}</p>
+              </div>
+              <div>
+                <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Unique</p>
+                <p className="text-xl font-black text-indigo-500">{stats[r.id]?.unique || 0}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="text-[10px]">
+                {r.notification_frequency !== 'none' && <span className="px-2 py-1 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 rounded-lg font-black uppercase">Daily 6AM</span>}
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setViewingLogsRedirect(r)} className="p-3 bg-zinc-50 dark:bg-zinc-800 text-zinc-500 rounded-2xl"><Eye className="w-5 h-5" /></button>
+                <button onClick={() => setEditingRedirect(r)} className="p-3 bg-zinc-50 dark:bg-zinc-800 text-zinc-500 rounded-2xl"><Edit3 className="w-5 h-5" /></button>
+                <button onClick={() => deleteRedirect(r.id)} className="p-3 bg-red-50 dark:bg-red-950/30 text-red-500 rounded-2xl"><Trash2 className="w-5 h-5" /></button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {redirects.length === 0 && (
+        <div className="py-20 text-center bg-white dark:bg-zinc-900 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800 text-zinc-400 italic text-sm">
+          No redirects found.
+        </div>
       )}
 
-      {/* ログ表示モーダル */}
-      {viewingLogsRedirect && (
-        <ViewLogsModal 
-          redirect={viewingLogsRedirect} 
-          onClose={() => setViewingLogsRedirect(null)} 
-        />
-      )}
+      {editingRedirect && <EditRedirectModal redirect={editingRedirect} onClose={() => setEditingRedirect(null)} onUpdated={fetchRedirects} />}
+      {viewingLogsRedirect && <ViewLogsModal redirect={viewingLogsRedirect} onClose={() => setViewingLogsRedirect(null)} />}
     </div>
   );
 }
